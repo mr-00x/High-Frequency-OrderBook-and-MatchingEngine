@@ -1,16 +1,15 @@
 #pragma once
 // ---------------------------------------------------------------------------
-// win_mutex.hpp
+// win_mutex.hpp (Cross-platform mutex abstraction)
 //
-// Thin RAII wrapper around Windows CRITICAL_SECTION that presents the same
-// interface as std::mutex / std::lock_guard.
-//
-// Required because MinGW.org GCC 6.3 does not provide a working <mutex>
-// implementation. On Linux / MinGW-w64 builds std::mutex is used directly;
-// this header is only compiled on MinGW.org (detected via _WIN32 without
-// _GLIBCXX_HAS_GTHREADS being defined by the GCC build).
+// On Windows with old MinGW, uses Windows CRITICAL_SECTION.
+// On modern Linux/Unix/GCC/Clang, uses standard std::mutex / std::lock_guard.
 // ---------------------------------------------------------------------------
 
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 
 namespace hft {
@@ -44,3 +43,15 @@ private:
 };
 
 } // namespace hft
+
+#else // POSIX / Linux / macOS
+
+#include <mutex>
+
+namespace hft {
+    using WinMutex = std::mutex;
+    template<typename M>
+    using LockGuard = std::lock_guard<M>;
+} // namespace hft
+
+#endif

@@ -1,21 +1,9 @@
 #pragma once
 // ---------------------------------------------------------------------------
-// server.hpp — Minimal HTTP/1.1 REST server over Winsock2
+// server.hpp — Cross-platform HTTP/1.1 REST server
 //
-// Why Winsock2 directly instead of cpp-httplib?
-//   MinGW.org GCC 6.3 does not ship a working <thread> / <mutex>
-//   implementation. Rather than pulling in a heavyweight dependency, this
-//   server is implemented directly on top of Windows Sockets, which are
-//   always available on Windows. On deployment (Linux Docker), the
-//   Dockerfile uses a modern GCC with cpp-httplib, so this file is only
-//   compiled locally on Windows for development / testing.
-//
-// Design:
-//   - Single-threaded, synchronous request/response loop (one client at a time)
-//   - Parses the request line + headers, reads an optional body, dispatches
-//     to a route handler, and writes the response back.
-//   - Routes are registered as std::function<std::string(Request&)> lambdas.
-//   - Response body is always JSON; Content-Type header is fixed.
+// Works on both Windows (Winsock2) and Linux/macOS (POSIX sockets).
+// Zero heavy external dependencies.
 //
 // Endpoints:
 //   POST   /orders          — submit a new order
@@ -26,11 +14,24 @@
 //   GET    /health          — liveness probe
 // ---------------------------------------------------------------------------
 
+#ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
+#else
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#define SOCKET int
+#define INVALID_SOCKET (-1)
+#define SOCKET_ERROR (-1)
+#define closesocket close
+#endif
 
 #include "../include/json.hpp"
 #include "matching_engine.hpp"
@@ -44,8 +45,6 @@
 #include <cctype>
 #include <cstdio>
 #include <cstring>
-
-#pragma comment(lib, "ws2_32.lib")
 
 namespace hft {
 
@@ -61,7 +60,6 @@ struct Request {
     std::string body;
     std::map<std::string, std::string> headers;
 
-    // Extract a named path segment (e.g. for /orders/42, segment(1) == "42")
     std::string segment(std::size_t idx) const {
         std::vector<std::string> parts;
         std::istringstream ss(path);
@@ -72,7 +70,6 @@ struct Request {
         return (idx < parts.size()) ? parts[idx] : "";
     }
 
-    // Query string extraction (e.g. /book?depth=5)
     std::string query_param(const std::string& key) const {
         auto pos = path.find('?');
         if (pos == std::string::npos) return "";
@@ -149,42 +146,48 @@ public:
         if (listen_sock_ != INVALID_SOCKET) {
             closesocket(listen_sock_);
         }
+#ifdef _WIN32
         WSACleanup();
+#endif
     }
 
     void run() {
+#ifdef _WIN32
         WSADATA wsa;
         if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
             fprintf(stderr, "[error] WSAStartup failed\n");
             return;
         }
+#endif
 
-        listen_sock_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        listen_sock_ = socket(AF_INET, SOCK_STREAM, 0);
         if (listen_sock_ == INVALID_SOCKET) {
-            fprintf(stderr, "[error] socket() failed\n");
-            WSACleanup();
+            fprintf(stderr, "[error] socket() creation failed\n");
             return;
         }
 
         // Allow immediate port reuse after restart
         int yes = 1;
+#ifdef _WIN32
         setsockopt(listen_sock_, SOL_SOCKET, SO_REUSEADDR,
-                   reinterpret_cast<char*>(&yes), sizeof(yes));
+                   reinterpret_cast<const char*>(&yes), sizeof(yes));
+#else
+        setsockopt(listen_sock_, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+#endif
 
         sockaddr_in addr{};
         addr.sin_family      = AF_INET;
         addr.sin_addr.s_addr = INADDR_ANY;
-        addr.sin_port        = htons(static_cast<u_short>(port_));
+        addr.sin_port        = htons(static_cast<uint16_t>(port_));
 
         if (bind(listen_sock_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == SOCKET_ERROR) {
             fprintf(stderr, "[error] bind() failed on port %d\n", port_);
             closesocket(listen_sock_);
-            WSACleanup();
             return;
         }
 
-        listen(listen_sock_, SOMAXCONN);
-        fprintf(stdout, "[info] Listening on port %d\n", port_);
+        listen(listen_sock_, 128);
+        fprintf(stdout, "[info] Server listening on port %d\n", port_);
 
         while (true) {
             SOCKET client = accept(listen_sock_, nullptr, nullptr);
@@ -202,31 +205,24 @@ public:
     }
 
 private:
-    // ------------------------------------------------------------------
-    // Read a complete HTTP request from the socket
-    // ------------------------------------------------------------------
     bool read_request(SOCKET sock, Request& req) {
-        // Read raw bytes into a string, stopping at end of headers
         std::string raw;
         char buf[4096];
         int  received;
 
-        // Read until we have the full header block (\r\n\r\n)
         while (true) {
             received = recv(sock, buf, sizeof(buf) - 1, 0);
             if (received <= 0) return false;
             buf[received] = '\0';
             raw += buf;
             if (raw.find("\r\n\r\n") != std::string::npos) break;
-            if (raw.size() > 65536) return false; // guard
+            if (raw.size() > 65536) return false;
         }
 
-        // Split into header block and partial body
         auto header_end = raw.find("\r\n\r\n");
         std::string header_block = raw.substr(0, header_end);
         std::string body_so_far  = raw.substr(header_end + 4);
 
-        // Parse request line
         std::istringstream ss(header_block);
         std::string request_line;
         std::getline(ss, request_line);
@@ -236,7 +232,6 @@ private:
         std::istringstream rl(request_line);
         rl >> req.method >> req.path;
 
-        // Parse headers
         std::string line;
         std::size_t content_length = 0;
         while (std::getline(ss, line)) {
@@ -246,11 +241,9 @@ private:
             if (colon != std::string::npos) {
                 std::string key = line.substr(0, colon);
                 std::string val = line.substr(colon + 1);
-                // ltrim val
                 val.erase(val.begin(),
                           std::find_if(val.begin(), val.end(),
                                        [](int c){ return !std::isspace(c); }));
-                // lowercase key for lookup
                 std::string lk = key;
                 std::transform(lk.begin(), lk.end(), lk.begin(), ::tolower);
                 req.headers[lk] = val;
@@ -260,7 +253,6 @@ private:
             }
         }
 
-        // Read remaining body bytes
         req.body = body_so_far;
         while (req.body.size() < content_length) {
             std::size_t need = content_length - req.body.size();
@@ -274,41 +266,31 @@ private:
         return true;
     }
 
-    // ------------------------------------------------------------------
-    // Dispatch and write response
-    // ------------------------------------------------------------------
     void handle_client(SOCKET sock) {
         Request req;
         if (!read_request(sock, req)) return;
 
         std::string response;
 
-        // OPTIONS preflight
         if (req.method == "OPTIONS") {
             response = http_response(204, "");
         }
-        // GET /health
         else if (req.method == "GET" && req.clean_path() == "/health") {
             response = http_response(200, R"({"status":"ok"})");
         }
-        // POST /orders
         else if (req.method == "POST" && req.clean_path() == "/orders") {
             response = handle_post_order(req);
         }
-        // DELETE /orders/{id}
         else if (req.method == "DELETE" &&
                  req.clean_path().substr(0, 8) == "/orders/") {
             response = handle_delete_order(req);
         }
-        // GET /book
         else if (req.method == "GET" && req.clean_path() == "/book") {
             response = handle_get_book(req);
         }
-        // GET /trades
         else if (req.method == "GET" && req.clean_path() == "/trades") {
             response = handle_get_trades(req);
         }
-        // GET /stats
         else if (req.method == "GET" && req.clean_path() == "/stats") {
             response = handle_get_stats(req);
         }
@@ -318,10 +300,6 @@ private:
 
         send(sock, response.c_str(), static_cast<int>(response.size()), 0);
     }
-
-    // ------------------------------------------------------------------
-    // Route handlers
-    // ------------------------------------------------------------------
 
     std::string handle_post_order(const Request& req) {
         try {
