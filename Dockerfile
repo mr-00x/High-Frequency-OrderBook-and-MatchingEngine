@@ -25,7 +25,7 @@ RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
 # ==========================================
 # Production Runtime Stage
 # ==========================================
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 WORKDIR /app
 
