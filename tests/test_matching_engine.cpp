@@ -3,8 +3,8 @@
 // Integration tests for the MatchingEngine: full match cycles, partial fills,
 // cancellation, market orders, stats, and edge cases.
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include "doctest.h"
+#define TEST_MAIN
+#include "test_framework.hpp"
 #include "matching_engine.hpp"
 
 using namespace hft;
@@ -55,7 +55,7 @@ TEST_CASE("MatchingEngine: full match between buy and sell") {
     // One trade recorded
     auto trades = engine.recent_trades();
     REQUIRE(trades.size() == 1);
-    CHECK(trades[0].price    == doctest::Approx(100.0));
+    CHECK(trades[0].price_as_double() == doctest::Approx(100.0));
     CHECK(trades[0].quantity == 10);
 
     auto stats = engine.stats();
@@ -124,7 +124,7 @@ TEST_CASE("MatchingEngine: price improvement — buy at higher price than restin
 
     auto trades = engine.recent_trades();
     REQUIRE(trades.size() == 1);
-    CHECK(trades[0].price == doctest::Approx(100.0)); // exec at resting price
+    CHECK(trades[0].price_as_double() == doctest::Approx(100.0)); // exec at resting price
     CHECK(trades[0].quantity == 10);
 
     auto snap = engine.book_snapshot();

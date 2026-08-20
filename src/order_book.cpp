@@ -74,15 +74,15 @@ OrderBookSnapshot OrderBook::snapshot(std::size_t depth) const {
     snap.asks.reserve(depth);
 
     std::size_t count = 0;
-    for (const auto& [price, level] : bid_levels_) {
+    for (const auto& kv : bid_levels_) {
         if (count++ >= depth) break;
-        snap.bids.push_back({level.price / 100.0, level.total_quantity});
+        snap.bids.push_back({kv.second.price / 100.0, kv.second.total_quantity});
     }
 
     count = 0;
-    for (const auto& [price, level] : ask_levels_) {
+    for (const auto& kv : ask_levels_) {
         if (count++ >= depth) break;
-        snap.asks.push_back({level.price / 100.0, level.total_quantity});
+        snap.asks.push_back({kv.second.price / 100.0, kv.second.total_quantity});
     }
 
     return snap;

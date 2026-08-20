@@ -30,7 +30,7 @@ SubmitResult MatchingEngine::submit(Side side, OrderType type,
         return {false, 0, "limit order price must be > 0"};
     }
 
-    std::lock_guard<std::mutex> lock(mutex_);
+    LockGuard<WinMutex> lock(mutex_);
 
     auto t_start = std::chrono::high_resolution_clock::now();
 
@@ -87,7 +87,7 @@ SubmitResult MatchingEngine::submit(Side side, OrderType type,
 // ---------------------------------------------------------------------------
 
 bool MatchingEngine::cancel(uint64_t order_id) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    LockGuard<WinMutex> lock(mutex_);
 
     Order* order = book_.find(order_id);
     if (!order) return false;
@@ -104,7 +104,7 @@ bool MatchingEngine::cancel(uint64_t order_id) {
 // ---------------------------------------------------------------------------
 
 OrderBookSnapshot MatchingEngine::book_snapshot(std::size_t depth) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    LockGuard<WinMutex> lock(mutex_);
     return book_.snapshot(depth);
 }
 
@@ -113,7 +113,7 @@ OrderBookSnapshot MatchingEngine::book_snapshot(std::size_t depth) {
 // ---------------------------------------------------------------------------
 
 std::vector<Trade> MatchingEngine::recent_trades(std::size_t n) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    LockGuard<WinMutex> lock(mutex_);
     std::vector<Trade> result;
     std::size_t count = std::min(n, trade_log_.size());
     result.reserve(count);
@@ -128,7 +128,7 @@ std::vector<Trade> MatchingEngine::recent_trades(std::size_t n) {
 // ---------------------------------------------------------------------------
 
 EngineStats MatchingEngine::stats() {
-    std::lock_guard<std::mutex> lock(mutex_);
+    LockGuard<WinMutex> lock(mutex_);
     return stats_;
 }
 

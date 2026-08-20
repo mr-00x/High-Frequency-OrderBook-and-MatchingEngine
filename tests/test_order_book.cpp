@@ -2,8 +2,8 @@
 //
 // Unit tests for OrderBook: insert, remove, find, snapshot, price ordering.
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include "doctest.h"
+#define TEST_MAIN
+#include "test_framework.hpp"
 #include "order_book.hpp"
 #include "order.hpp"
 #include <memory>

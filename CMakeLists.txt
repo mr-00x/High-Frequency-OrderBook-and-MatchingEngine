@@ -12,11 +12,17 @@ if(MSVC)
     add_compile_options(/W4 /O2)
 else()
     add_compile_options(
-        -Wall -Wextra -Wpedantic
+        -Wall -Wextra
         -O2
-        -pthread
     )
 endif()
+
+# cpp-httplib requires Windows 10 (0x0A00) or later
+if(WIN32)
+    add_compile_definitions(_WIN32_WINNT=0x0A00)
+endif()
+
+
 
 # ---------------------------------------------------------------------------
 # Include paths
@@ -50,6 +56,10 @@ endif()
 add_executable(hft_engine src/main.cpp)
 target_link_libraries(hft_engine hft_core)
 
+if(WIN32)
+    target_link_libraries(hft_engine ws2_32)
+endif()
+
 if(UNIX)
     target_link_libraries(hft_engine pthread)
 endif()
@@ -79,3 +89,17 @@ foreach(test_src ${TEST_SOURCES})
     endif()
     add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
+
+# ---------------------------------------------------------------------------
+# Benchmark executable
+# ---------------------------------------------------------------------------
+add_executable(benchmark tests/benchmark.cpp)
+target_include_directories(benchmark PRIVATE
+    ${CMAKE_SOURCE_DIR}/tests
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src
+)
+target_link_libraries(benchmark hft_core)
+if(UNIX)
+    target_link_libraries(benchmark pthread)
+endif()

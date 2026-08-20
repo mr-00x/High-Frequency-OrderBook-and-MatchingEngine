@@ -3,8 +3,8 @@
 // Unit tests for the MemoryPool<T> slab allocator.
 // Uses doctest (single-header, no external deps).
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include "doctest.h"
+#define TEST_MAIN
+#include "test_framework.hpp"
 #include "memory_pool.hpp"
 #include "order.hpp"
 

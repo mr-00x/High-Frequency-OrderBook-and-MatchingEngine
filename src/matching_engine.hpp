@@ -3,13 +3,12 @@
 #include "order.hpp"
 #include "order_book.hpp"
 #include "memory_pool.hpp"
+#include "win_mutex.hpp"
 #include <atomic>
-#include <mutex>
 #include <vector>
 #include <deque>
 #include <chrono>
 #include <cstdint>
-#include <optional>
 #include <string>
 
 namespace hft {
@@ -95,7 +94,7 @@ private:
     uint64_t next_timestamp() noexcept;
 
     std::string             symbol_;
-    std::mutex              mutex_;
+    WinMutex                mutex_;
     OrderBook               book_;
     MemoryPool<Order>       pool_;
     std::atomic<uint64_t>   next_order_id_{1};
