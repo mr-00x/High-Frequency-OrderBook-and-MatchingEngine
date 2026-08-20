@@ -3,22 +3,33 @@ import StatsPanel from './components/StatsPanel';
 import OrderBook from './components/OrderBook';
 import OrderForm from './components/OrderForm';
 import TradesFeed from './components/TradesFeed';
+import DepthChart from './components/DepthChart';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 export default function App() {
+  const [theme, setTheme] = useState('dark');
   const [book, setBook] = useState({ bids: [], asks: [], symbol: 'STOCK' });
   const [trades, setTrades] = useState([]);
   const [stats, setStats] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [selectedPrice, setSelectedPrice] = useState(null);
 
+  // Sync theme with HTML data-theme attribute
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
   // Poll server state
   const fetchData = useCallback(async () => {
     try {
       const [bookRes, tradesRes, statsRes] = await Promise.all([
-        fetch(`${API_BASE}/book?depth=10`),
-        fetch(`${API_BASE}/trades?limit=40`),
+        fetch(`${API_BASE}/book?depth=12`),
+        fetch(`${API_BASE}/trades?limit=50`),
         fetch(`${API_BASE}/stats`)
       ]);
 
@@ -41,7 +52,7 @@ export default function App() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 400);
+    const interval = setInterval(fetchData, 350);
     return () => clearInterval(interval);
   }, [fetchData]);
 
@@ -53,7 +64,7 @@ export default function App() {
         body: JSON.stringify(orderPayload)
       });
       const data = await res.json();
-      fetchData(); // Immediate refresh after order submission
+      fetchData(); // Immediate refresh after submission
       return data;
     } catch (err) {
       return { ok: false, message: err.message };
@@ -74,6 +85,17 @@ export default function App() {
             <span className={`dot ${isConnected ? 'online' : 'offline'}`} />
             <span>{isConnected ? 'Engine Online (8080)' : 'Connecting to Core Engine...'}</span>
           </div>
+
+          {/* Light / Dark Mode Toggle */}
+          <button 
+            type="button" 
+            className="theme-toggle-btn"
+            onClick={toggleTheme}
+            title="Toggle Light / Dark Mode"
+          >
+            {theme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode'}
+          </button>
+
           <span className="mono" style={{ fontSize: '12px', color: 'var(--accent-cyan)' }}>
             C++17 Core · FIFO L2
           </span>
@@ -84,6 +106,9 @@ export default function App() {
       <main className="dashboard-grid">
         {/* Top Metric Strip */}
         <StatsPanel stats={stats} isConnected={isConnected} />
+
+        {/* Visual Market Depth Liquidity Curve */}
+        <DepthChart book={book} trades={trades} />
 
         {/* Left: Order Submission Form */}
         <OrderForm 

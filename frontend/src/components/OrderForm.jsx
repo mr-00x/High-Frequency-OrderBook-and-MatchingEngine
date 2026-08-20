@@ -9,6 +9,10 @@ export default function OrderForm({ onSubmitOrder, selectedPrice, isConnected })
   const [isBotActive, setIsBotActive] = useState(false);
   const botIntervalRef = useRef(null);
 
+  // Dynamic state for random-walk market simulation
+  const midPriceRef = useRef(100.0);
+  const volatilityRef = useRef(0.15);
+
   useEffect(() => {
     if (selectedPrice) {
       setPrice(selectedPrice.toFixed(2));
@@ -51,25 +55,62 @@ export default function OrderForm({ onSubmitOrder, selectedPrice, isConnected })
     }
   };
 
-  // Automated Market Maker / Flow Simulation Bot
+  // High-Frequency Market Maker Simulation Bot (Geometric Brownian Motion + Order Flow)
   useEffect(() => {
     if (isBotActive) {
       botIntervalRef.current = setInterval(() => {
-        const randSide = Math.random() > 0.5 ? 'buy' : 'sell';
-        const randType = Math.random() > 0.15 ? 'limit' : 'market';
-        // Cluster prices around 100.00 +- 2.50
-        const basePrice = 100.0;
-        const offset = (Math.random() * 4.0 - 2.0);
-        const simPrice = parseFloat((basePrice + offset).toFixed(2));
-        const simQty = Math.floor(Math.random() * 30) + 5;
+        // Micro-Brownian random walk with mean-reversion toward 100.00
+        const drift = (100.0 - midPriceRef.current) * 0.05;
+        const shock = (Math.random() - 0.5) * volatilityRef.current;
+        midPriceRef.current = Math.max(90.0, Math.min(110.0, midPriceRef.current + drift + shock));
 
-        onSubmitOrder({
-          side: randSide,
-          type: randType,
-          price: randType === 'limit' ? simPrice : 0,
-          quantity: simQty
-        });
-      }, 350);
+        // Realistic Order Size distribution
+        const sizeRand = Math.random();
+        let simQty;
+        if (sizeRand < 0.70) {
+          // Retail lots: 5, 10, 15, 20, 25, 50
+          simQty = [5, 10, 15, 20, 25, 50][Math.floor(Math.random() * 6)];
+        } else if (sizeRand < 0.95) {
+          // Institutional blocks: 75, 100, 150, 200, 300
+          simQty = [75, 100, 150, 200, 300][Math.floor(Math.random() * 5)];
+        } else {
+          // Whale blocks: 500, 750, 1000
+          simQty = [500, 750, 1000][Math.floor(Math.random() * 3)];
+        }
+
+        const flowType = Math.random();
+
+        // 75% Passive Market Making (Placing Bids below mid, Asks above mid)
+        if (flowType < 0.75) {
+          const isBuy = Math.random() > 0.5;
+          const spreadOffset = parseFloat(((Math.random() * 0.80) + 0.05).toFixed(2));
+          const simPrice = isBuy
+            ? parseFloat((midPriceRef.current - spreadOffset).toFixed(2))
+            : parseFloat((midPriceRef.current + spreadOffset).toFixed(2));
+
+          onSubmitOrder({
+            side: isBuy ? 'buy' : 'sell',
+            type: 'limit',
+            price: Math.max(0.01, simPrice),
+            quantity: simQty
+          });
+        } 
+        // 25% Aggressive Crossing Orders (Market orders & crossing limits triggering trades)
+        else {
+          const isAggressiveBuy = Math.random() > 0.5;
+          const isMarket = Math.random() > 0.4;
+          const crossPrice = isAggressiveBuy
+            ? parseFloat((midPriceRef.current + 0.10).toFixed(2))
+            : parseFloat((midPriceRef.current - 0.10).toFixed(2));
+
+          onSubmitOrder({
+            side: isAggressiveBuy ? 'buy' : 'sell',
+            type: isMarket ? 'market' : 'limit',
+            price: isMarket ? 0 : crossPrice,
+            quantity: Math.min(simQty, 100)
+          });
+        }
+      }, 200); // 5 simulated events per second
     } else {
       if (botIntervalRef.current) clearInterval(botIntervalRef.current);
     }
@@ -78,18 +119,30 @@ export default function OrderForm({ onSubmitOrder, selectedPrice, isConnected })
     };
   }, [isBotActive, onSubmitOrder]);
 
+  // Realistic Market Maker Burst (50 orders across a full order book ladder)
   const handleStressTest = async () => {
-    showToast('Executing 50 rapid simulated orders...', 'success');
-    for (let i = 0; i < 50; i++) {
-      const randSide = Math.random() > 0.5 ? 'buy' : 'sell';
-      const p = parseFloat((100.0 + (Math.random() * 3.0 - 1.5)).toFixed(2));
-      const q = Math.floor(Math.random() * 20) + 1;
-      onSubmitOrder({
-        side: randSide,
-        type: 'limit',
-        price: p,
-        quantity: q
-      });
+    showToast('Injecting 50 realistic multi-level limit & market orders...', 'success');
+    const mid = midPriceRef.current;
+    
+    // Inject layered bids
+    for (let i = 1; i <= 20; i++) {
+      const p = parseFloat((mid - (i * 0.15) - (Math.random() * 0.05)).toFixed(2));
+      const q = Math.floor(Math.random() * 40) + 10;
+      onSubmitOrder({ side: 'buy', type: 'limit', price: p, quantity: q });
+    }
+
+    // Inject layered asks
+    for (let i = 1; i <= 20; i++) {
+      const p = parseFloat((mid + (i * 0.15) + (Math.random() * 0.05)).toFixed(2));
+      const q = Math.floor(Math.random() * 40) + 10;
+      onSubmitOrder({ side: 'sell', type: 'limit', price: p, quantity: q });
+    }
+
+    // Inject 10 aggressive crossing executions
+    for (let i = 0; i < 10; i++) {
+      const isBuy = Math.random() > 0.5;
+      const q = Math.floor(Math.random() * 25) + 5;
+      onSubmitOrder({ side: isBuy ? 'buy' : 'sell', type: 'market', price: 0, quantity: q });
     }
   };
 
@@ -217,7 +270,7 @@ export default function OrderForm({ onSubmitOrder, selectedPrice, isConnected })
 
       {/* Interactive Simulation Controls */}
       <div className="sim-controls">
-        <span className="metric-label" style={{ fontSize: '10px' }}>Simulation & Flow Generator</span>
+        <span className="metric-label" style={{ fontSize: '10px' }}>HFT Simulation & Flow Generator</span>
         <button
           type="button"
           className={`sim-btn ${isBotActive ? 'active' : ''}`}
@@ -232,7 +285,7 @@ export default function OrderForm({ onSubmitOrder, selectedPrice, isConnected })
           className="sim-btn"
           onClick={handleStressTest}
         >
-          ⚡ Blast 50 Rapid Limit Orders
+          ⚡ Blast 50 Realistic Flow Orders
         </button>
       </div>
     </div>
