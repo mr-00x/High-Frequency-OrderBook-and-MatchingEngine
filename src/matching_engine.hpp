@@ -24,6 +24,7 @@ struct EngineStats {
     uint64_t trades_executed{0};
     uint64_t total_volume{0};      // cumulative matched quantity
     double   avg_match_latency_us{0.0}; // microseconds
+    double   avg_match_latency_ns{0.0}; // nanoseconds
 };
 
 // ---------------------------------------------------------------------------

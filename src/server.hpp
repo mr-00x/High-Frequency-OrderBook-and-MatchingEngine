@@ -421,6 +421,7 @@ private:
         resp["trades_executed"]      = s.trades_executed;
         resp["total_volume"]         = s.total_volume;
         resp["avg_match_latency_us"] = s.avg_match_latency_us;
+        resp["avg_match_latency_ns"] = s.avg_match_latency_ns;
 
         return http_response(200, resp.dump());
     }
