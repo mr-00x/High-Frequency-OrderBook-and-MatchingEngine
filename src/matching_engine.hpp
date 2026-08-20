@@ -77,6 +77,9 @@ public:
     // Current engine statistics.
     EngineStats stats();
 
+    // Pre-populate realistic resting market liquidity and baseline trade history
+    void seed_market(double mid_price = 100.0, std::size_t levels = 10);
+
     [[nodiscard]] const std::string& symbol() const noexcept { return symbol_; }
 
 private:

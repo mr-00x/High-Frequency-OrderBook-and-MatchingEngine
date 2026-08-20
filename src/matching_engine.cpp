@@ -138,6 +138,35 @@ EngineStats MatchingEngine::stats() {
 }
 
 // ---------------------------------------------------------------------------
+// seed_market
+// ---------------------------------------------------------------------------
+
+void MatchingEngine::seed_market(double mid_price, std::size_t levels) {
+    // 1. Place resting bids
+    for (std::size_t i = 1; i <= levels; ++i) {
+        double px = mid_price - (static_cast<double>(i) * 0.25);
+        uint64_t scaled_px = static_cast<uint64_t>(px * 100.0 + 0.5);
+        uint64_t qty = 15 + (i * 8);
+        submit(Side::BUY, OrderType::LIMIT, scaled_px, qty);
+    }
+
+    // 2. Place resting asks
+    for (std::size_t i = 1; i <= levels; ++i) {
+        double px = mid_price + (static_cast<double>(i) * 0.25);
+        uint64_t scaled_px = static_cast<uint64_t>(px * 100.0 + 0.5);
+        uint64_t qty = 18 + (i * 7);
+        submit(Side::SELL, OrderType::LIMIT, scaled_px, qty);
+    }
+
+    // 3. Place crossing orders to generate realistic baseline trade executions
+    uint64_t trade_px_1 = static_cast<uint64_t>((mid_price + 0.25) * 100.0 + 0.5);
+    submit(Side::BUY, OrderType::LIMIT, trade_px_1, 10);
+
+    uint64_t trade_px_2 = static_cast<uint64_t>((mid_price - 0.25) * 100.0 + 0.5);
+    submit(Side::SELL, OrderType::LIMIT, trade_px_2, 8);
+}
+
+// ---------------------------------------------------------------------------
 // match (private)
 //
 // Price-time priority: iterate resting orders from best price, FIFO within level.

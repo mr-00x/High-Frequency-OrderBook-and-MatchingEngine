@@ -9,9 +9,43 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 export default function App() {
   const [theme, setTheme] = useState('dark');
-  const [book, setBook] = useState({ bids: [], asks: [], symbol: 'STOCK' });
-  const [trades, setTrades] = useState([]);
-  const [stats, setStats] = useState(null);
+  const [book, setBook] = useState({
+    symbol: 'STOCK',
+    bids: [
+      { price: 99.75, quantity: 45 },
+      { price: 99.50, quantity: 60 },
+      { price: 99.25, quantity: 80 },
+      { price: 99.00, quantity: 120 },
+      { price: 98.75, quantity: 150 },
+      { price: 98.50, quantity: 210 },
+      { price: 98.25, quantity: 280 },
+      { price: 98.00, quantity: 340 }
+    ],
+    asks: [
+      { price: 100.25, quantity: 50 },
+      { price: 100.50, quantity: 75 },
+      { price: 100.75, quantity: 95 },
+      { price: 101.00, quantity: 130 },
+      { price: 101.25, quantity: 160 },
+      { price: 101.50, quantity: 220 },
+      { price: 101.75, quantity: 290 },
+      { price: 102.00, quantity: 360 }
+    ]
+  });
+  const [trades, setTrades] = useState([
+    { trade_id: 104, price: 100.25, quantity: 25, buy_order_id: 88, sell_order_id: 82, timestamp: Date.now() * 1000000 },
+    { trade_id: 103, price: 99.75, quantity: 40, buy_order_id: 79, sell_order_id: 85, timestamp: (Date.now() - 500) * 1000000 },
+    { trade_id: 102, price: 100.00, quantity: 15, buy_order_id: 72, sell_order_id: 75, timestamp: (Date.now() - 1200) * 1000000 }
+  ]);
+  const [stats, setStats] = useState({
+    orders_submitted: 1420,
+    orders_filled: 890,
+    orders_cancelled: 120,
+    trades_executed: 445,
+    total_volume: 18450,
+    avg_match_latency_ns: 680,
+    avg_match_latency_us: 0.68
+  });
   const [isConnected, setIsConnected] = useState(false);
   const [selectedPrice, setSelectedPrice] = useState(null);
 

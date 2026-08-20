@@ -28,7 +28,12 @@ int main() {
     std::cout << "=================================================\n";
 
     hft::MatchingEngine engine("STOCK");
-    hft::Server         server(engine, port);
+    
+    // Pre-seed realistic market depth and initial trade history
+    engine.seed_market(100.0, 10);
+    std::cout << "[info] Preloaded realistic market liquidity (10 Bid & 10 Ask levels + baseline trades).\n";
+
+    hft::Server server(engine, port);
 
     std::cout << "[info] Engine ready. Waiting for orders...\n";
     server.run();
