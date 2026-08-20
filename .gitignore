@@ -1,3 +1,13 @@
+# vibe coding & agent artifacts
+Agents.md
+Implementation.md
+Deployment.md
+.agents/
+artifacts/
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
 # Prerequisites
 *.d
 
