@@ -1,0 +1,49 @@
+name: C++ Build & Test Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup C++ Compiler & CMake
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++ cmake
+
+      - name: Configure CMake
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build All Targets
+        run: cmake --build build -j$(nproc)
+
+      - name: Run Memory Pool Unit Tests
+        run: ./build/test_memory_pool
+
+      - name: Run Order Book Unit Tests
+        run: ./build/test_order_book
+
+      - name: Run Matching Engine Unit Tests
+        run: ./build/test_matching_engine
+
+      - name: Run 100k Order Performance Benchmark
+        run: ./build/benchmark
+
+      - name: Setup Node.js for Frontend
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build Frontend
+        working-directory: ./frontend
+        run: |
+          npm install
+          npm run build
